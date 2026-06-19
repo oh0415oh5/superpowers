@@ -113,3 +113,13 @@ Before proposing changes to skill design, workflow philosophy, or architecture, 
 - One problem per PR
 - Test on at least one harness and report results in the environment table
 - Describe the problem you solved, not just what you changed
+
+## Cursor Cloud specific instructions
+
+This is a zero-dependency plugin (skills + bash/Node hooks), not a long-running app. Notes below are non-obvious caveats; see `docs/testing.md` for the full test map.
+
+- Dependencies: the root `package.json` has no runtime deps, so a root `npm install` is a no-op (it creates no `node_modules`). The only npm dependency anywhere is the test-only `ws` package in `tests/brainstorm-server/` — the startup update script installs it there.
+- Lint: `scripts/lint-shell.sh` requires `shellcheck` on PATH (and `shfmt` only with `--format`). Default mode lints changed-vs-HEAD files; `scripts/lint-shell.sh --all` lints the whole tracked baseline and currently surfaces pre-existing `shellcheck` warnings in a few `tests/` shell scripts. These are system tools (apt), not in the update script.
+- Tests: run per-directory `run-*.sh` / `npm test` (see `docs/testing.md`). The brainstorm-server suite runs via `npm test` in `tests/brainstorm-server/`. `tests/codex-plugin-sync/` and `scripts/sync-to-codex-plugin.sh` need `rsync` (a real sync also needs authenticated `gh` + `python3`). `tests/pi/test-pi-extension.mjs` imports a `.ts` extension — on Node older than 22.18 run it with `node --experimental-strip-types tests/pi/test-pi-extension.mjs`.
+- Eval/LLM tests are out of scope for infra setup: `evals/` is a separate, gitignored repo needing `uv` + `ANTHROPIC_API_KEY`, and `tests/claude-code/` + `tests/explicit-skill-requests/` drive real LLM sessions.
+- Running the "app" (brainstorming visual companion): start `skills/brainstorming/scripts/start-server.sh` (pass `--foreground` in environments that reap background processes). It serves a key-gated `http://localhost:<port>/?key=...` URL, watches `<session>/content/*.html` "screens" for live reload over WebSocket, and appends each `data-choice` click the user makes to `<session>/state/events` (the file the agent reads back).
